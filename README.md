@@ -8,6 +8,8 @@
 ![deck.gl](https://img.shields.io/badge/deck.gl-WebGL-ff69b4)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
+[![Ecobici CDMX Pulse](docs/assets/og.png)](https://osvaldo6242.github.io/ecobici-cdmx-pulse/)
+
 ### 👉 [Open the interactive story](https://osvaldo6242.github.io/ecobici-cdmx-pulse/)
 
 > 🇪🇸 [Resumen en español](#resumen-en-español) más abajo.
