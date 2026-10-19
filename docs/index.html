@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ecobici CDMX Pulse</title>
+<meta name="description" content="18 millones de viajes en bicicleta pública: cómo se mueve la Ciudad de México, hora por hora. Big data, machine learning y visualización interactiva.">
+<meta property="og:title" content="Ecobici CDMX Pulse — el pulso de la ciudad en bicicleta">
+<meta property="og:description" content="Big data, pronóstico de demanda, anomalías, redes y clustering sobre 12 meses de Ecobici.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<link href="assets/style.css" rel="stylesheet">
+</head>
+<body>
+
+<div id="map-wrap">
+  <div id="map"></div>
+  <div id="deck-canvas"></div>
+  <div id="map-hud">
+    <div id="clock" class="mono">06:00</div>
+    <div id="active" class="mono"></div>
+    <div id="hud-label">Viajes en curso</div>
+    <div id="legend"></div>
+  </div>
+  <div id="hour-control" hidden>
+    <button id="hour-play" aria-label="Reproducir">❚❚</button>
+    <input id="hour-slider" type="range" min="0" max="23" value="8" aria-label="Hora del día">
+    <span id="hour-label" class="mono">08:00</span>
+  </div>
+</div>
+
+<header id="hero">
+  <div class="hero-inner">
+    <p class="kicker">Big data · Machine learning · Visualización</p>
+    <h1>El pulso de la Ciudad de México <span class="grad">en bicicleta</span></h1>
+    <p class="lead">Analicé <b id="k-trips">—</b> viajes reales de Ecobici durante 12 meses
+      para entender cómo respira la ciudad: a qué hora despierta, hacia dónde fluye,
+      qué la detiene y cómo anticiparla.</p>
+    <div class="kpis">
+      <div><span class="num" data-key="valid_trips">0</span><span>viajes válidos</span></div>
+      <div><span class="num" data-key="stations">0</span><span>estaciones</span></div>
+      <div><span class="num" data-key="days">0</span><span>días analizados</span></div>
+      <div><span class="num" data-key="forecast_r2" data-dec="2">0</span><span>R² del pronóstico</span></div>
+    </div>
+    <p class="scroll-hint">Desliza para explorar ↓</p>
+  </div>
+</header>
+
+<main id="story">
+  <section class="step" data-step="trips">
+    <div class="card">
+      <h2>Un miércoles cualquiera</h2>
+      <p>Cada línea es un viaje real del <b id="s-day">—</b>: <b id="s-day-trips">—</b> recorridos
+        en un solo día. Los colores distinguen a <span class="chip f">mujeres</span>,
+        <span class="chip m">hombres</span> y <span class="chip o">sin dato</span>.</p>
+      <p class="muted">La animación avanza ~10 minutos por segundo. Los trayectos se dibujan como
+        arcos entre estación de origen y destino (los datos no incluyen la ruta exacta).</p>
+    </div>
+  </section>
+
+  <section class="step" data-step="columns">
+    <div class="card">
+      <h2>La ciudad respira por horas</h2>
+      <p>Columnas 3D: salidas promedio por estación en un día laboral. A las
+        <b id="s-peak">—</b> la red alcanza su máximo; Reforma, Polanco y la Roma-Condesa
+        se encienden en las horas pico.</p>
+      <p class="muted">Usa el control inferior para moverte por las 24 horas.</p>
+    </div>
+  </section>
+
+  <section class="step" data-step="flows">
+    <div class="card">
+      <h2>Hacia dónde fluye</h2>
+      <p>Los 450 pares origen-destino más intensos. Un algoritmo de detección de comunidades
+        (Louvain, modularidad <b id="s-mod">—</b>) encontró <b id="s-comm">—</b> “barrios ciclistas”
+        que casi no se mezclan entre sí: cada color es una comunidad.</p>
+    </div>
+  </section>
+
+  <section class="step" data-step="clusters">
+    <div class="card">
+      <h2>Cada estación tiene personalidad</h2>
+      <p>Con K-means sobre el perfil de 24 horas de salidas y llegadas, las estaciones se agrupan
+        en <b id="s-k">—</b> arquetipos.</p>
+      <div id="cluster-chart" class="chart small"></div>
+    </div>
+  </section>
+
+  <section class="step" data-step="rebalance">
+    <div class="card">
+      <h2>¿Dónde faltan o sobran bicis?</h2>
+      <p>Flujo neto acumulado en un día laboral promedio, en relación con la capacidad de
+        cada estación. Las <span class="chip red">rojas</span> se vacían; las
+        <span class="chip blue">azules</span> se saturan. Es el mapa que necesita un equipo
+        de rebalanceo cada mañana.</p>
+      <ol id="rebalance-list" class="ranked"></ol>
+    </div>
+  </section>
+</main>
+
+<div id="charts">
+  <section class="panel">
+    <h2>El ritmo semanal</h2>
+    <p class="muted">Viajes promedio por hora y día de la semana.</p>
+    <div id="heatmap" class="chart"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Pronóstico de demanda</h2>
+    <p>Un modelo de <b>gradient boosting</b> con calendario, clima, calidad del aire y rezagos
+      predice los viajes de cada hora. Validación temporal <i>rolling-origin</i>; abajo, las
+      últimas 4 semanas que el modelo nunca vio.</p>
+    <div class="metric-row" id="forecast-metrics"></div>
+    <div id="forecast" class="chart tall"></div>
+    <div id="model-compare" class="chart small"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Días que rompieron el patrón</h2>
+    <p>Cada cuadro es un día. El color muestra cuánto se desvió la demanda real del pronóstico;
+      los marcados con anillo son anomalías estadísticas (|z| ≥ 3).</p>
+    <div id="calendar" class="chart"></div>
+  </section>
+
+  <section class="panel two">
+    <div>
+      <h2>Cuando llueve</h2>
+      <p id="rain-text">—</p>
+      <div id="rain-chart" class="chart small"></div>
+    </div>
+    <div>
+      <h2>Calidad del aire</h2>
+      <p>Hallazgo honesto: <b>la contaminación no reduce el uso de la bici</b>. Comparando cada hora con lo típico para esa misma franja, la demanda casi no cambia entre aire “aceptable” y “malo”. Un promedio simple sugeriría lo contrario, porque la contaminación y los viajes suben juntos en horas pico. Las pocas horas con aire “bueno” suelen ser lluviosas, de ahí su menor demanda.</p>
+      <div id="aqi-chart" class="chart small"></div>
+    </div>
+  </section>
+
+  <section class="panel two">
+    <div>
+      <h2>Brecha de género</h2>
+      <p>Solo <b id="r-women">—</b> de los viajes los hacen mujeres. La proporción cambia a lo largo del día:</p>
+      <div id="gender-hour" class="chart small"></div>
+    </div>
+    <div>
+      <h2>Edades</h2>
+      <p class="muted">Viajes por grupo de edad y género (celdas con menos de 100 viajes suprimidas).</p>
+      <div id="age-chart" class="chart small"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Cómo está hecho</h2>
+    <div class="stack">
+      <div><h3>Ingeniería de datos</h3><p>Descarga reanudable de 12 CSV oficiales → lago Parquet (zstd) → warehouse DuckDB con modelos SQL en capas staging / intermediate / marts.</p></div>
+      <div><h3>Calidad</h3><p id="dq-text">—</p></div>
+      <div><h3>Machine learning</h3><p>Gradient boosting Poisson vs. Ridge vs. baseline estacional; validación rolling-origin; predicciones fuera de muestra por bloques semanales para anomalías.</p></div>
+      <div><h3>Ciencia de redes</h3><p>Grafo dirigido origen-destino, PageRank y comunidades Louvain con NetworkX.</p></div>
+      <div><h3>Privacidad</h3><p>Solo se publican agregados; celdas demográficas con menos de 100 viajes se suprimen.</p></div>
+      <div><h3>Visualización</h3><p>deck.gl (WebGL), MapLibre, D3 y Scrollama. Sitio estático en GitHub Pages, CI con GitHub Actions.</p></div>
+    </div>
+    <p class="links">
+      <a class="btn" href="https://github.com/Osvaldo6242/ecobici-cdmx-pulse">Ver el código en GitHub</a>
+    </p>
+    <p class="muted small">Datos: Ecobici CDMX (datos abiertos), Open-Meteo (clima ERA5 y calidad del aire CAMS).
+      Mapa © OpenStreetMap contributors © CARTO. Autor: Marco Osvaldo Murillo Arellano.</p>
+  </section>
+</div>
+
+<div id="tooltip" hidden></div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/deck.gl@9.0.38/dist.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://unpkg.com/scrollama@3.2.0/build/scrollama.min.js"></script>
+<script src="assets/charts.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

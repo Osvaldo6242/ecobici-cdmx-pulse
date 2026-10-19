@@ -1,0 +1,9 @@
+[project]
+name = "ecobici-cdmx-pulse"
+version = "1.0.0"
+description = "Big-data analytics and interactive storytelling on Mexico City's public bike system"
+requires-python = ">=3.9"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore:.*encountered in matmul:RuntimeWarning"]
